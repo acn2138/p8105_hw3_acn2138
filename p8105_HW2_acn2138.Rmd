@@ -1,0 +1,169 @@
+---
+title: "p8105_HW2_acn2138"
+output: github_document
+---
+
+Amanda Nagle's HW 2 
+
+# Problem 1
+ 
+Importing and cleaning the Mr. Trashwheel dataset. 
+```{r message = FALSE, warning = FALSE}
+library(tidyverse)
+library(readxl)
+
+mr_trashwheel_data = 
+      read_xlsx("./Problem 1 data/Trash-Wheel-Collection-Totals-8-6-19.xlsx",
+      sheet = "Mr. Trash Wheel",
+      range = cell_cols("A:N")) %>%
+      janitor::clean_names() %>%
+      drop_na(dumpster) %>% 
+      mutate(
+        sports_balls = round(sports_balls),
+        sports_balls = as.integer(sports_balls))
+
+```
+This code reads in precipitation data, cleans the names, and adds a variable for year. 
+
+```{R message = FALSE, warning = FALSE}
+precip_2017 = read_xlsx( "./Problem 1 data/Trash-Wheel-Collection-Totals-8-6-19.xlsx",
+      sheet = "2017 Precipitation",
+      skip= 1) %>%
+      janitor::clean_names() %>%
+      drop_na(month) %>%
+      mutate(year = 2017) %>%
+      relocate(year)
+
+precip_2018 = read_xlsx( "./Problem 1 data/Trash-Wheel-Collection-Totals-8-6-19.xlsx",
+      sheet = "2018 Precipitation",
+      skip= 1) %>%
+      janitor::clean_names() %>%
+      drop_na(month) %>%
+      mutate(year = 2018) %>%
+      relocate(year)
+```
+
+Next combining annual precipitation from 2017 and 2018
+
+```{r message = FALSE, warning = FALSE}
+month_df = tibble(month = 1:12, month_name = month.name)
+
+precip_df = bind_rows (precip_2018, precip_2017)
+
+both_years_correct_month = left_join(precip_df, month_df, by = "month")
+
+
+```
+The Mr. Trashwheel data is information about the trash collected from the river in Baltimore, Maryland from 2014 through 2019. It contains data about the kinds and amount of trash gathered each month. After cleaning the dataset has `r nrow(mr_trashwheel_data)` rows and `r ncol(mr_trashwheel_data)` variables. 
+
+# Problem 2
+
+Importing and cleaning the subway data.
+
+This dataset contains one row for ever entrance/exit in the NYC subway system. The important variables are the line name and station name because these allow the user to understand subway stations. The routes are important to understand which trains stop at the station. 
+
+First, the data is read in and the route variables are read as characters. 
+Then the variable names are cleaned. Certain columns are kept and entry is changed to a logical variable. 
+
+
+```{r message = FALSE, warning = FALSE}
+subway_data = read_csv(file = "./problem 2 data/NYC_Transit_Subway_Entrance_And_Exit_Data.csv", 
+                       col_types = cols(
+                          Route8 = col_character(),
+                          Route9 = col_character(),
+                          Route10 = col_character(),
+                          Route11 = col_character())) %>%
+  janitor::clean_names()  %>%
+  select(line, station_name, route1:route11, station_latitude, station_longitude, entry, vending, entrance_type, ada) %>%
+  mutate(entry = ifelse(entry == "YES", "TRUE", "FALSE"))
+
+  
+
+```
+
+The resulting dataset has `r ncol(subway_data)` variables and `r nrow(subway_data)` rows. These data are not yet tidy.
+
+Answering questions: 
+```{R message = FALSE, warning = FALSE}
+answering_question_2_1 = subway_data %>% 
+    distinct(line, station_name)
+
+answering_question_2_2 = subway_data %>%
+        filter(ada == TRUE) %>%
+        distinct(line, station_name)
+
+answering_question_2_3 = subway_data %>%
+      filter(vending == "NO") %>%
+      mutate(entrance_num = ifelse(entry == "TRUE", 1, 0)) %>%
+      summarise(mean(entrance_num))
+```
+
+There are `r nrow(answering_question_2_1)` distinct subway stations. `r nrow(answering_question_2_2)`  are ADA compliant.
+`r answering_question_2_3*100` percent of entrance/exits without vending access that allow entrance. 
+
+Next, the route variables are changed from wide format to long format and the extra, uninformative rows are deleted. These were created when each station was given ten rows of possible routes, but most only have a few routes passing through them. 
+```{R message = FALSE, warning = FALSE}
+  subway_longer = subway_data %>% 
+  pivot_longer(route1:route11, names_to = "route_num", names_prefix = "route", values_to = "route_name") %>%
+  filter(!is.na(route_name))
+```
+new number of rows is `r nrow(subway_longer)`.
+
+```{R message = FALSE, warning = FALSE}
+answering_2_4 = subway_longer %>%
+  filter(route_name == "A") %>%
+  distinct(station_name, line)
+
+answering_2_5 = subway_longer %>%
+  filter(route_name == "A", ada == TRUE) %>%
+  distinct(station_name, line)
+
+
+```
+
+The number of unique stations on the A is `r nrow(answering_2_4)`.
+
+Of those, `r nrow(answering_2_5)` are ada compliant.
+
+
+
+
+# Problem 3
+
+Importing and cleaning the fivethirthyeight datasets.
+
+```{r message = FALSE, warning = FALSE}
+polls_data = read_csv(file = "./fivethirtyeight_datasets/pols-month.csv") %>% 
+            janitor::clean_names() %>%
+            separate(mon, c("year", "month_numz", "day"), sep = "-") %>%
+            mutate(president = ifelse(prez_gop == 1, "gop", "dem")) %>%
+            select(-prez_gop, -prez_dem, -day)
+            
+month_helper= tibble( month_numz= c("01", "02", "03","04", "05", "06", "07", "08", "09", "10", "11", "12" ), month_name = c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), month_num = as.character(1:12))
+
+polls_data= left_join(polls_data, month_helper, by= c("month_numz")) %>%
+            select(-month_num)
+    
+snp_data = read_csv(file = "./fivethirtyeight_datasets/snp.csv", 
+                    col_types = cols(date = col_character())) %>% 
+            janitor::clean_names() %>%
+            separate(date, c("month_num", "day", "year"), sep = "/") %>% 
+            relocate(year, month_num) %>%
+            select(-day)
+
+snp_data= left_join(snp_data, month_helper, by= c("month_num")) %>%
+            select(-month_numz, -month_num)
+            
+unemployment_data = read_csv(file = "./fivethirtyeight_datasets/unemployment.csv") %>% 
+            janitor::clean_names() %>%
+            pivot_longer(jan:dec, names_to = "month_name", values_to = "unemployment") %>%
+            mutate(year= as.character(year))
+
+most_data= left_join(polls_data, snp_data, by= c("year", "month_name"))
+
+all_data = left_join(most_data, unemployment_data, by = c("year", "month_name"))
+```
+The above code imports and cleans datasets containing information on polls and government positions, the SNP 500, and the unemployment rate. Each dataset has one row per month. The datasets had the date variables in different formats, so they were standardized to have month and year in separate columns and for the month variable to be in character form with no preceding zero.
+
+The datasets were merged on year and month to create one dataset with `r nrow(all_data)` rows and `r ncol(all_data)` columns. The years in the dataset range from 1950 to 2015.
+
