@@ -30,7 +30,7 @@ items_from_aisle = instacart %>%
                    count(aisle) %>%
                     arrange(desc(n))
 
-items_from_aisle %>%
+aisle_plot = items_from_aisle %>%
  filter(n > 10000) %>%
   mutate(
     aisle = factor(aisle),
@@ -39,6 +39,8 @@ items_from_aisle %>%
   ggplot(aes(x = aisle, y = n)) +
   geom_point() +
   theme(axis.text.x = element_text(angle = 270, vjust = 0.5, hjust = 1))
+
+plot(aisle_plot)
 ```
 Making a table:
 
@@ -121,13 +123,14 @@ From this summary table we can see that Fridays have the most activity, on avera
 Making visualization for day of week
 ```{R message = FALSE, warning = FALSE, echo = TRUE}
 
-accelerometer_data %>%
+daily_plot = accelerometer_data %>%
   group_by(day_id) %>%
   ggplot(aes(x = minute, y = activity, group = day, color= day)) +
   geom_point(alpha=.2) +
   stat_smooth()
 
-  
+plot(daily_plot)
+
 ```
 Because the time granules are so small, the scatter plot is not idea to look at by itself, so I added a smoothed line showing the mean activity at each minute by day of the week. 
 
@@ -163,7 +166,7 @@ Snowfall and snow depth are measured in mm. Precipitation was recorded in 10ths 
 The most common snowfall measure was 0 inches and second was NA. 0 snowfall makes sense as it only snows in New York in the Winter. The NA values requires further investigations. These NA days should perhaps be coded as 0s
 
 ``` {r echo = TRUE}
-cleaned_noaa_data %>%
+temp_plot = cleaned_noaa_data %>%
   filter(month == "01" | month == "07") %>%
   group_by(month, year, id) %>%
   mutate(avg_tmax = mean(tmax, na.rm = TRUE, group = month)) %>%
@@ -172,6 +175,7 @@ cleaned_noaa_data %>%
     facet_grid(month ~ .)+
     theme(axis.text.x = element_text(angle = 270, vjust = 0.5, hjust = 1))
 
+plot(temp_plot)
 ```
 Generally, January has colder temperatures than July. July of 1988 did have one station that was much colder than the others, but generally, the stations have temps similar to one another. 
 
@@ -191,6 +195,6 @@ snow_plot = cleaned_noaa_data  %>%
   ggplot(aes(x=snow, group = year)) +
   geom_density()
 
-tmax_plot + snow_plot
+plot(tmax_plot + snow_plot)
 ```
 
