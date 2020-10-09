@@ -1,0 +1,196 @@
+---
+title: "p8105_HW3_acn2138"
+output: github_document
+---
+
+Amanda Nagle's HW 3 
+
+# Problem 1
+ 
+Importing and cleaning the instacart dataset. 
+```{r message = FALSE, warning = FALSE}
+library(tidyverse)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%")
+
+library(p8105.datasets)
+data("instacart")
+
+
+```
+The data in the instacart dataset has one row per item in customer order, with customer and order variables. It has `r nrow(instacart)` and `r ncol(instacart)` columns. 
+
+```{R message = FALSE, warning = FALSE}
+items_from_aisle = instacart %>%
+                   count(aisle) %>%
+                    arrange(desc(n))
+
+items_from_aisle %>%
+ filter(n > 10000) %>%
+  mutate(
+    aisle = factor(aisle),
+    aisle = fct_reorder(aisle, n)
+  ) %>%
+  ggplot(aes(x = aisle, y = n)) +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 270, vjust = 0.5, hjust = 1))
+```
+Making a table:
+
+```{r}
+
+instacart %>%
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>%
+   group_by(aisle) %>%
+  count(product_name) %>%
+  mutate(rank = min_rank(desc(n))) %>%
+  filter(rank < 4) %>%
+  arrange(aisle, rank) %>%
+  knitr::kable()
+
+```
+
+Apples v Icecream
+
+```{r}
+instacart %>%
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>%
+  group_by(product_name, order_dow) %>%
+  summarize(mean_hour = mean(order_hour_of_day)) %>%
+  pivot_wider(
+    names_from = order_dow,
+    values_from = mean_hour
+  )
+
+```
+
+
+# Problem 2
+
+Importing and tidying the accelerometer data.
+
+This dataset contains one row for ever entrance/exit in the NYC subway system. The important variables are the line name and station name because these allow the user to understand subway stations. The routes are important to understand which trains stop at the station. 
+
+
+```{r message = FALSE, warning = FALSE}
+accelerometer_data = read_csv(file = "./data/accel_data.csv") %>%
+                    janitor::clean_names()  %>%
+                    pivot_longer(activity_1:activity_1440,
+                                 names_to = "minute",
+                                 names_prefix = "activity.",
+                                 values_to = "activity") %>%
+                    mutate(weekday = ifelse(day %in% c("Saturday", "Sunday"), "weekend", "weekday"),
+                           day = factor(day,
+                                        levels= c("Sunday", "Monday", 
+    "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")),
+                            day_id = as.factor(day_id),
+                            minute = as.numeric(minute)) %>%
+                    arrange(day)
+  
+
+```
+The accelerometer data is now tidy with `r nrow(accelerometer_data)`, one for each minute of each day for `r nrow(accelerometer_data)/1440` days. There are `r ncol(accelerometer_data)` columns, one for the week, the numeric day starting at the first day, the day of the week the minute of the day, the amount of activity, and if it is a weekend or a weekday. 
+
+
+Creating table of day totals: 
+```{R message = FALSE, warning = FALSE}
+one_day_row = accelerometer_data %>%
+  group_by(week, day) %>%
+  summarize(total_activity= sum(activity)) %>%
+  arrange(week, day) 
+  
+wider = one_day_row %>%
+  pivot_wider(names_from = day, values_from = total_activity) 
+  
+knitr::kable(wider)
+```
+This table is informative, but to see trends by day of the week, I also made the table below. 
+
+```{r}
+one_day_row %>% 
+  group_by(day) %>%
+  summarize(mean_activity = mean(total_activity)) 
+```
+From this summary table we can see that Fridays have the most activity, on average. 
+
+Making visualization for day of week
+```{R message = FALSE, warning = FALSE, echo = TRUE}
+
+accelerometer_data %>%
+  group_by(day_id) %>%
+  ggplot(aes(x = minute, y = activity, group = day, color= day)) +
+  geom_point(alpha=.2) +
+  stat_smooth()
+
+  
+```
+Because the time granules are so small, the scatter plot is not idea to look at by itself, so I added a smoothed line showing the mean activity at each minute by day of the week. 
+
+From the second graph, we can see that this man does not domuch activity before 8:00, with a few exceptions on Thursdays. He is also most active on any day just after 8 pm. He is most active in the evening on Fridays. 
+
+# Problem 3
+
+Importing and cleaning the NY NOAA data.
+
+```{r message = FALSE, warning = FALSE, echo = TRUE}
+library(p8105.datasets)
+data("ny_noaa") 
+            
+summarize(ny_noaa, mean(tmax, na.rm=true))
+
+cleaned_noaa_data = ny_noaa %>%
+  separate(date, c("year", "month", "day"), sep = "-") %>% 
+  mutate(prcp = prcp*10, tmax = as.numeric(tmax), tmin = as.numeric(tmin))
+
+#summarize(cleaned_noaa_data, mean(tmax, na.rm = TRUE))
+  
+  #mode snowfall 
+cleaned_noaa_data %>%
+  mutate(chr_snw = as.character(snow)) %>%
+  count(chr_snw) %>%
+  arrange(desc(n))
+  
+```
+The New York NOAA data is a subset of the National Oceanic and Atmospheric Administration's database of data from weather station. It has`r nrow(ny_noaa)` rows of data. The columns are `r colnames(ny_noaa)`, where prcp is precipitation and snwd is snow depth. tmax and tmin are missing for much of the data set, which is concerning.
+
+Snowfall and snow depth are measured in mm. Precipitation was recorded in 10ths of mms, but was edited to me mm to be consistent with the other two measures. 
+
+The most common snowfall measure was 0 inches and second was NA. 0 snowfall makes sense as it only snows in New York in the Winter. The NA values requires further investigations. These NA days should perhaps be coded as 0s
+
+``` {r echo = TRUE}
+cleaned_noaa_data %>%
+  filter(month == "01" | month == "07") %>%
+  group_by(month, year, id) %>%
+  mutate(avg_tmax = mean(tmax, na.rm = TRUE, group = month)) %>%
+  ggplot(aes(x=year, y=avg_tmax)) +
+    geom_point() +         
+    facet_grid(month ~ .)+
+    theme(axis.text.x = element_text(angle = 270, vjust = 0.5, hjust = 1))
+
+```
+Generally, January has colder temperatures than July. July of 1988 did have one station that was much colder than the others, but generally, the stations have temps similar to one another. 
+
+tmax v tmin
+```{r echo = TRUE}
+library(plotly)
+library(patchwork)
+
+tmax_plot = cleaned_noaa_data %>%
+    ggplot(aes(x=tmax, y= tmin)) +
+    geom_hex()
+
+snow_plot = cleaned_noaa_data  %>%
+  filter(snow<100) %>%
+  filter(snow>0) %>%
+  group_by(year) %>%
+  ggplot(aes(x=snow, group = year)) +
+  geom_density()
+
+tmax_plot + snow_plot
+```
+
